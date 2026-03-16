@@ -9,11 +9,11 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 # إعداد Flask
 app = Flask(__name__)
 
-# جلب التوكن
+# جلب التوكن من إعدادات Vercel
 TOKEN = os.getenv('BOT_TOKEN')
 EMOJI_LIST = ["👏", "😁", "🤔", "🤯", "😱", "🙏", "👌", "🕊️", "🤡", "🥱", "🥴", "😍", "🐳", "🏆", "⚡", "😂", "🌚", "💔", "🤨", "😐", "💋", "😈", "🙈", "👀", "💻", "👻", "🤓", "😭", "😴", "😇", "😰", "🤝", "✍️", "😊", "🫡", "💅", "🤪", "🗿", "🆒", "💘", "👾", "😎", "😉", "😘", "😡", "❤️", "👍", "👎", "🔥", "🥰", "🎉", "😢", "🍓", "💯", "❤️‍🔥"]
 
-# بناء التطبيق مرة واحدة خارج الدالة لتوفير الوقت
+# بناء التطبيق
 tg_app = ApplicationBuilder().token(TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -26,31 +26,32 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reaction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.chat.type in ['group', 'supergroup']:
         try:
+            # اختيار إيموجي عشوائي وإرسال التفاعل
             await update.message.set_reaction(reaction=[ReactionTypeEmoji(emoji=random.choice(EMOJI_LIST))])
         except Exception as e:
             logging.error(f"Reaction Error: {e}")
 
-# إضافة المعالجات (Handlers)
+# إضافة الأوامر والمعالجات
 tg_app.add_handler(CommandHandler("start", start_command))
 tg_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, reaction_handler))
 
+# دالة معالجة الويب هوك (تدعم المسار الرئيسي والفرعي)
+@app.route('/', methods=['POST', 'GET'])
 @app.route('/api/index', methods=['POST', 'GET'])
 async def webhook():
     if request.method == "POST":
         try:
-            # تحويل البيانات القادمة من تلجرام
+            # تحويل البيانات القادمة من تلجرام إلى كائن Update
             update = Update.de_json(request.get_json(force=True), tg_app.bot)
             
-            # تشغيل معالجة التحديث بشكل صحيح داخل بيئة Vercel
+            # معالجة التحديث بشكل آمن داخل بيئة Vercel
             async with tg_app:
                 await tg_app.process_update(update)
             
             return 'ok', 200
         except Exception as e:
             logging.error(f"Webhook Error: {e}")
-            return 'error', 500
-    return "Please use POST", 200
-
-@app.route('/')
-def home():
-    return "Bot is running on Vercel!"
+            return f"Error: {e}", 500
+    
+    # رسالة تظهر عند فتح الرابط في المتصفح فقط
+    return "<h3>Bot is running!</h3><p>Status: Active and waiting for Telegram updates.</p>", 200
