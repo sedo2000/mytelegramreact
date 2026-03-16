@@ -1,57 +1,49 @@
 import os
-import logging
-import random
 import asyncio
 from flask import Flask, request
 from telegram import Update, ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
-# إعداد Flask
 app = Flask(__name__)
 
-# جلب التوكن من إعدادات Vercel
-TOKEN = os.getenv('BOT_TOKEN')
+# جلب التوكن مع وضع قيمة افتراضية للتأكد من عدم حدوث Error 500 بسبب التوكن
+TOKEN = os.getenv('BOT_TOKEN', '8270945505:AAGBeMBqvEp2RhDLCTCAMurChwWimceCt84')
+
 EMOJI_LIST = ["👏", "😁", "🤔", "🤯", "😱", "🙏", "👌", "🕊️", "🤡", "🥱", "🥴", "😍", "🐳", "🏆", "⚡", "😂", "🌚", "💔", "🤨", "😐", "💋", "😈", "🙈", "👀", "💻", "👻", "🤓", "😭", "😴", "😇", "😰", "🤝", "✍️", "😊", "🫡", "💅", "🤪", "🗿", "🆒", "💘", "👾", "😎", "😉", "😘", "😡", "❤️", "👍", "👎", "🔥", "🥰", "🎉", "😢", "🍓", "💯", "❤️‍🔥"]
 
-# بناء التطبيق
+# تعريف التطبيق
 tg_app = ApplicationBuilder().token(TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message and update.message.chat.type == 'private':
-        admin_url = f"https://t.me/Gahkawkwbot?startgroup=true&admin=post_messages+edit_messages+delete_messages+invite_users+pin_messages"
-        keyboard = [[InlineKeyboardButton("💎 المطور ↗️", url="https://t.me/theycallmesjd")],
-                    [InlineKeyboardButton("🔹 اضفني الى مجموعتك 🔹", url=admin_url)]]
-        await update.message.reply_text("<b>بوت تفاعلات تلقائية .</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    if update.message:
+        keyboard = [[InlineKeyboardButton("💎 المطور ↗️", url="https://t.me/theycallmesjd")]]
+        await update.message.reply_text("<b>البوت يعمل بنجاح على فيرسل!</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
 async def reaction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.chat.type in ['group', 'supergroup']:
         try:
-            # اختيار إيموجي عشوائي وإرسال التفاعل
+            import random
             await update.message.set_reaction(reaction=[ReactionTypeEmoji(emoji=random.choice(EMOJI_LIST))])
-        except Exception as e:
-            logging.error(f"Reaction Error: {e}")
+        except:
+            pass
 
-# إضافة الأوامر والمعالجات
 tg_app.add_handler(CommandHandler("start", start_command))
 tg_app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, reaction_handler))
 
-# دالة معالجة الويب هوك (تدعم المسار الرئيسي والفرعي)
 @app.route('/', methods=['POST', 'GET'])
 @app.route('/api/index', methods=['POST', 'GET'])
-async def webhook():
+def webhook():
     if request.method == "POST":
         try:
-            # تحويل البيانات القادمة من تلجرام إلى كائن Update
-            update = Update.de_json(request.get_json(force=True), tg_app.bot)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             
-            # معالجة التحديث بشكل آمن داخل بيئة Vercel
-            async with tg_app:
-                await tg_app.process_update(update)
+            update = Update.de_json(request.get_json(force=True), tg_app.bot)
+            loop.run_until_complete(tg_app.initialize())
+            loop.run_until_complete(tg_app.process_update(update))
             
             return 'ok', 200
         except Exception as e:
-            logging.error(f"Webhook Error: {e}")
-            return f"Error: {e}", 500
-    
-    # رسالة تظهر عند فتح الرابط في المتصفح فقط
-    return "<h3>Bot is running!</h3><p>Status: Active and waiting for Telegram updates.</p>", 200
+            print(f"Error: {e}")
+            return str(e), 500
+    return "OK", 200
